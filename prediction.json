@@ -1,0 +1,49 @@
+{
+  "bar_time_utc": "2026-03-16T09:55:00+00:00",
+  "close": 23355.599609375,
+  "feature_names": [
+    "open",
+    "high",
+    "low",
+    "close",
+    "RSI",
+    "EMA20",
+    "MACD",
+    "MACD_signal",
+    "MACD_hist",
+    "momentum",
+    "BB_upper",
+    "BB_middle",
+    "BB_lower",
+    "return_3",
+    "return_5"
+  ],
+  "features": {
+    "BB_lower": 23082.330520980806,
+    "BB_middle": 23326.09990234375,
+    "BB_upper": 23569.869283706696,
+    "EMA20": 23336.59306760433,
+    "MACD": 60.682048098242376,
+    "MACD_hist": -6.719439134923348,
+    "MACD_signal": 67.40148723316572,
+    "RSI": 57.41295462546422,
+    "close": 23355.599609375,
+    "high": 23359.900390625,
+    "low": 23338.599609375,
+    "momentum": 19.006541770668264,
+    "open": 23354.849609375,
+    "return_3": -0.003398742945989519,
+    "return_5": -0.001969925728216526
+  },
+  "generated_at_utc": "2026-03-16T15:47:41.450911+00:00",
+  "interval": "5m",
+  "period": "5d",
+  "proba_0": 0.9999966025352478,
+  "proba_1": 3.4264594432897866e-06,
+  "signal": "SELL",
+  "symbol": "^NSEI",
+  "thresholds": {
+    "buy": 0.7,
+    "sell": 0.7
+  }
+}
