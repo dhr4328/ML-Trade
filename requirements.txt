@@ -5,3 +5,4 @@ joblib>=1.4.0
 scikit-learn>=1.4.0
 xgboost>=2.0.0
 TA-Lib>=0.4.28
+requests>=2.32.0

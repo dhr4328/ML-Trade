@@ -44,6 +44,8 @@ jobs:
           MARKET_CLOSE_HHMM: "15:30"
           SLEEP_SECONDS: "300"
           LOG_NDJSON: "predictions.ndjson"
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
         run: |
           python scripts/nifty_predict.py
 

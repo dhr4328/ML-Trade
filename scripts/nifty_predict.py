@@ -9,6 +9,7 @@ from typing import Optional
 import joblib
 import numpy as np
 import pandas as pd
+import requests
 import yfinance as yf
 
 # Ensure repo root is importable when running `python scripts/...`.
@@ -177,6 +178,51 @@ def _should_stop(now_local: datetime, close_h: int, close_m: int) -> bool:
     return (now_local.hour, now_local.minute) >= (close_h, close_m)
 
 
+def send_telegram_notification(payload: dict) -> None:
+    token = os.getenv("TELEGRAM_BOT_TOKEN")
+    chat_id = os.getenv("TELEGRAM_CHAT_ID")
+    if not token or not chat_id:
+        return
+
+    signal = payload.get("signal")
+    if signal not in ("BUY", "SELL"):
+        return
+
+    symbol = payload.get("symbol")
+    close = payload.get("close")
+    p0 = payload.get("proba_0")
+    p1 = payload.get("proba_1")
+    bar_time = payload.get("bar_time_utc")
+    generated = payload.get("generated_at_utc")
+
+    text = (
+        f"NIFTY Signal: {signal}\n"
+        f"Symbol: {symbol}\n"
+        f"Price: {close:.2f}\n"
+        f"P(target=0): {p0:.4f}\n"
+        f"P(target=1): {p1:.4f}\n"
+        f"Bar time (UTC): {bar_time}\n"
+        f"Generated at (UTC): {generated}"
+    )
+
+    url = f"https://api.telegram.org/bot{token}/sendMessage"
+    try:
+        resp = requests.post(
+            url,
+            json={
+                "chat_id": chat_id,
+                "text": text,
+                "parse_mode": "HTML",
+                "disable_web_page_preview": True,
+            },
+            timeout=10,
+        )
+        if resp.status_code != 200:
+            print(f"Telegram send failed: {resp.status_code} {resp.text}")
+    except Exception as exc:
+        print(f"Telegram send error: {exc}")
+
+
 def main() -> None:
     symbol = _env("SYMBOL", "^NSEI")
     period = _env("PERIOD", "5d")
@@ -233,6 +279,9 @@ def main() -> None:
 
         with open(log_ndjson, "a", encoding="utf-8") as f:
             f.write(json.dumps(payload, sort_keys=True) + "\n")
+
+        # Optional Telegram notification for BUY/SELL signals.
+        send_telegram_notification(payload)
 
         print(json.dumps(payload, indent=2, sort_keys=True))
 
