@@ -4,5 +4,5 @@ numpy>=1.26.0
 joblib>=1.4.0
 scikit-learn>=1.4.0
 xgboost>=2.0.0
-ta-lib>=0.4.28
+pandas_ta>=0.3.14b0
 requests>=2.32.0

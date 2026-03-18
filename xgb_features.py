@@ -1,5 +1,5 @@
 import pandas as pd
-import talib as ta
+import pandas_ta as ta
 
 # Feature list used for both backtesting and live prediction.
 features = [
@@ -19,15 +19,33 @@ features = [
 
 def add_indicators(df: pd.DataFrame) -> pd.DataFrame:
     df = df.copy()
-    df["RSI"] = ta.RSI(df["close"], timeperiod=14)
-    df["EMA20"] = ta.EMA(df["close"], timeperiod=20)
-    df["MACD"], df["MACD_signal"], df["MACD_hist"] = ta.MACD(
-        df["close"], fastperiod=12, slowperiod=26, signalperiod=9
-    )
+    df["RSI"] = ta.rsi(df["close"], length=14)
+    df["EMA20"] = ta.ema(df["close"], length=20)
+
+    macd = ta.macd(df["close"], fast=12, slow=26, signal=9)
+    if macd is None or macd.empty:
+        df["MACD"] = pd.NA
+        df["MACD_signal"] = pd.NA
+        df["MACD_hist"] = pd.NA
+    else:
+        # pandas_ta names: MACD_12_26_9, MACDh_12_26_9, MACDs_12_26_9
+        df["MACD"] = macd.iloc[:, 0]
+        df["MACD_hist"] = macd.iloc[:, 1]
+        df["MACD_signal"] = macd.iloc[:, 2]
+
     df["momentum"] = df["close"] - df["EMA20"]
-    df["BB_upper"], df["BB_middle"], df["BB_lower"] = ta.BBANDS(
-        df["close"], timeperiod=20, nbdevdn=2, nbdevup=2
-    )
+
+    bb = ta.bbands(df["close"], length=20, std=2.0)
+    if bb is None or bb.empty:
+        df["BB_lower"] = pd.NA
+        df["BB_middle"] = pd.NA
+        df["BB_upper"] = pd.NA
+    else:
+        # pandas_ta names: BBL_20_2.0, BBM_20_2.0, BBU_20_2.0, BBB_20_2.0, BBP_20_2.0
+        df["BB_lower"] = bb.iloc[:, 0]
+        df["BB_middle"] = bb.iloc[:, 1]
+        df["BB_upper"] = bb.iloc[:, 2]
+
     df["return_3"] = df["close"].pct_change(periods=3)
     df["return_5"] = df["close"].pct_change(periods=5)
     return df
