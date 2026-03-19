@@ -1,6 +1,5 @@
 
 import pandas as pd
-import pandas_ta as ta
 
 # Feature list used for both backtesting and live prediction.
 features = [
@@ -20,32 +19,40 @@ features = [
 
 def add_indicators(df: pd.DataFrame) -> pd.DataFrame:
     df = df.copy()
-    df["RSI"] = ta.rsi(df["close"], length=14)
-    df["EMA20"] = ta.ema(df["close"], length=20)
+    close = df["close"]
 
-    macd = ta.macd(df["close"], fast=12, slow=26, signal=9)
-    if macd is None or macd.empty:
-        df["MACD"] = pd.NA
-        df["MACD_signal"] = pd.NA
-        df["MACD_hist"] = pd.NA
-    else:
-        # pandas_ta names: MACD_12_26_9, MACDh_12_26_9, MACDs_12_26_9
-        df["MACD"] = macd.iloc[:, 0]
-        df["MACD_hist"] = macd.iloc[:, 1]
-        df["MACD_signal"] = macd.iloc[:, 2]
+    # RSI (14-period)
+    window_rsi = 14
+    delta = close.diff()
+    gain = delta.where(delta > 0, 0.0)
+    loss = -delta.where(delta < 0, 0.0)
+    avg_gain = gain.rolling(window=window_rsi, min_periods=window_rsi).mean()
+    avg_loss = loss.rolling(window=window_rsi, min_periods=window_rsi).mean()
+    rs = avg_gain / avg_loss
+    df["RSI"] = 100 - (100 / (1 + rs))
+
+    # EMA 20
+    df["EMA20"] = close.ewm(span=20, adjust=False).mean()
+
+    # MACD (12, 26, 9)
+    ema_fast = close.ewm(span=12, adjust=False).mean()
+    ema_slow = close.ewm(span=26, adjust=False).mean()
+    macd_line = ema_fast - ema_slow
+    signal_line = macd_line.ewm(span=9, adjust=False).mean()
+    hist_line = macd_line - signal_line
+    df["MACD"] = macd_line
+    df["MACD_signal"] = signal_line
+    df["MACD_hist"] = hist_line
 
     df["momentum"] = df["close"] - df["EMA20"]
 
-    bb = ta.bbands(df["close"], length=20, std=2.0)
-    if bb is None or bb.empty:
-        df["BB_lower"] = pd.NA
-        df["BB_middle"] = pd.NA
-        df["BB_upper"] = pd.NA
-    else:
-        # pandas_ta names: BBL_20_2.0, BBM_20_2.0, BBU_20_2.0, BBB_20_2.0, BBP_20_2.0
-        df["BB_lower"] = bb.iloc[:, 0]
-        df["BB_middle"] = bb.iloc[:, 1]
-        df["BB_upper"] = bb.iloc[:, 2]
+    # Bollinger Bands (20, 2.0)
+    window_bb = 20
+    rolling_mean = close.rolling(window=window_bb, min_periods=window_bb).mean()
+    rolling_std = close.rolling(window=window_bb, min_periods=window_bb).std()
+    df["BB_middle"] = rolling_mean
+    df["BB_upper"] = rolling_mean + 2.0 * rolling_std
+    df["BB_lower"] = rolling_mean - 2.0 * rolling_std
 
     df["return_3"] = df["close"].pct_change(periods=3)
     df["return_5"] = df["close"].pct_change(periods=5)
