@@ -26,8 +26,6 @@ jobs:
           # Install base dependencies
           pip install -r requirements.txt
           
-          # 🔥 Fix pandas_ta issue (force install from GitHub)
-          pip install git+https://github.com/twopirllc/pandas-ta.git
 
       - name: Run prediction (NIFTY)
         env:
