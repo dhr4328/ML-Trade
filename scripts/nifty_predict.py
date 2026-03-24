@@ -192,8 +192,22 @@ def send_telegram_notification(payload: dict) -> None:
     close = payload.get("close")
     p0 = payload.get("proba_0")
     p1 = payload.get("proba_1")
-    bar_time = payload.get("bar_time_utc")
-    generated = payload.get("generated_at_utc")
+
+    tz_name = os.getenv("TZ_NAME", "Asia/Kolkata")
+
+    def format_ts(ts_str):
+        if not ts_str:
+            return "N/A"
+        try:
+            dt = pd.to_datetime(ts_str)
+            if dt.tz is None:
+                dt = dt.tz_localize("UTC")
+            return dt.tz_convert(tz_name).strftime("%Y-%m-%d %I:%M:%S %p")
+        except Exception:
+            return str(ts_str)
+
+    bar_time_str = format_ts(payload.get("bar_time_utc"))
+    generated_str = format_ts(payload.get("generated_at_utc"))
 
     text = (
         f"NIFTY Signal: {signal}\n"
@@ -201,8 +215,8 @@ def send_telegram_notification(payload: dict) -> None:
         f"Price: {close:.2f}\n"
         f"P(target=0): {p0:.4f}\n"
         f"P(target=1): {p1:.4f}\n"
-        f"Bar time (UTC): {bar_time}\n"
-        f"Generated at (UTC): {generated}"
+        f"Bar time ({tz_name}): {bar_time_str}\n"
+        f"Generated at ({tz_name}): {generated_str}"
     )
 
     url = f"https://api.telegram.org/bot{token}/sendMessage"
@@ -221,6 +235,85 @@ def send_telegram_notification(payload: dict) -> None:
             print(f"Telegram send failed: {resp.status_code} {resp.text}")
     except Exception as exc:
         print(f"Telegram send error: {exc}")
+
+
+def handle_telegram_commands(payload: dict) -> None:
+    token = os.getenv("TELEGRAM_BOT_TOKEN")
+    chat_id = os.getenv("TELEGRAM_CHAT_ID")
+    if not token or not chat_id:
+        return
+
+    offset_file = "telegram_offset.txt"
+    offset = 0
+    if os.path.exists(offset_file):
+        try:
+            with open(offset_file, "r") as f:
+                offset = int(f.read().strip())
+        except Exception:
+            pass
+
+    url = f"https://api.telegram.org/bot{token}/getUpdates"
+    try:
+        resp = requests.get(url, params={"offset": offset, "timeout": 5})
+        if resp.status_code != 200:
+            return
+        data = resp.json()
+        if not data.get("ok"):
+            return
+
+        updates = data.get("result", [])
+        new_offset = offset
+        for update in updates:
+            update_id = update["update_id"]
+            new_offset = max(new_offset, update_id + 1)
+
+            message = update.get("message", {})
+            text = message.get("text", "")
+            msg_chat_id = str(message.get("chat", {}).get("id", ""))
+            msg_date = message.get("date", 0)
+
+            # Avoid responding to very old messages if state was lost
+            now_ts = int(time.time())
+            if now_ts - msg_date > 3600:  # Ignore messages older than 1 hour
+                continue
+
+            if text.startswith("/status") and msg_chat_id == str(chat_id):
+                symbol = payload.get("symbol")
+                close = payload.get("close")
+                tz_name = os.getenv("TZ_NAME", "Asia/Kolkata")
+                
+                def format_ts(ts_str):
+                    if not ts_str:
+                        return "N/A"
+                    try:
+                        dt = pd.to_datetime(ts_str)
+                        if dt.tz is None:
+                            dt = dt.tz_localize("UTC")
+                        return dt.tz_convert(tz_name).strftime("%Y-%m-%d %I:%M:%S %p")
+                    except Exception:
+                        return str(ts_str)
+
+                bar_time_str = format_ts(payload.get("bar_time_utc"))
+
+                reply_text = (
+                    f"📊 <b>Status Report</b>\n"
+                    f"Symbol: {symbol}\n"
+                    f"Last Price: {close:.2f}\n"
+                    f"Bar Time ({tz_name}): {bar_time_str}"
+                )
+
+                send_url = f"https://api.telegram.org/bot{token}/sendMessage"
+                requests.post(
+                    send_url,
+                    json={"chat_id": chat_id, "text": reply_text, "parse_mode": "HTML"},
+                    timeout=10,
+                )
+
+        if new_offset > offset:
+            with open(offset_file, "w") as f:
+                f.write(str(new_offset))
+    except Exception as exc:
+        print(f"Telegram commands error: {exc}")
 
 
 def main() -> None:
@@ -282,6 +375,9 @@ def main() -> None:
 
         # Optional Telegram notification for BUY/SELL signals.
         send_telegram_notification(payload)
+        
+        # Check for any incoming telegram commands (e.g. /status)
+        handle_telegram_commands(payload)
 
         print(json.dumps(payload, indent=2, sort_keys=True))
 
