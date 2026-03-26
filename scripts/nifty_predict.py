@@ -237,6 +237,30 @@ def send_telegram_notification(payload: dict) -> None:
         print(f"Telegram send error: {exc}")
 
 
+def send_telegram_message(text: str) -> None:
+    token = os.getenv("TELEGRAM_BOT_TOKEN")
+    chat_id = os.getenv("TELEGRAM_CHAT_ID")
+    if not token or not chat_id:
+        return
+
+    url = f"https://api.telegram.org/bot{token}/sendMessage"
+    try:
+        resp = requests.post(
+            url,
+            json={
+                "chat_id": chat_id,
+                "text": text,
+                "parse_mode": "HTML",
+                "disable_web_page_preview": True,
+            },
+            timeout=10,
+        )
+        if resp.status_code != 200:
+            print(f"Telegram message send failed: {resp.status_code} {resp.text}")
+    except Exception as exc:
+        print(f"Telegram message send error: {exc}")
+
+
 def handle_telegram_commands(payload: dict) -> None:
     token = os.getenv("TELEGRAM_BOT_TOKEN")
     chat_id = os.getenv("TELEGRAM_CHAT_ID")
@@ -338,6 +362,8 @@ def main() -> None:
         feature_names = list(default_features)
 
     close_h, close_m = _parse_hhmm(market_close_hhmm)
+
+    send_telegram_message(f"🚀 <b>Bot Started</b>\nMonitoring: {symbol}\nInterval: {interval}")
 
     while True:
         now_local = _local_now(tz_name)
